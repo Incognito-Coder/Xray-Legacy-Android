@@ -48,7 +48,8 @@ jobs:
             unzip \
             curl \
             jq \
-            upx-ucl
+            upx-ucl \
+            build-essential
 
       - name: Clone Xray-core
         run: |
@@ -92,11 +93,7 @@ jobs:
             -v \
             -trimpath \
             -buildvcs=false \
-            -ldflags="
-              -s -w
-              -buildid=
-              -X github.com/xtls/xray-core/core.build=${DATE}
-            " \
+            -ldflags="-s -w -buildid= -X github.com/xtls/xray-core/core.build=${{ env.DATE }}" \
             -o build/${{ matrix.binary_name }} \
             ./main
 
@@ -107,6 +104,7 @@ jobs:
       - name: Verify binary
         run: |
           file xray/build/${{ matrix.binary_name }}
+          ls -lh xray/build/${{ matrix.binary_name }}
 
       - name: Create Magisk module
         run: |
@@ -124,8 +122,8 @@ jobs:
           cat > $MODULE/module.prop <<EOF
           id=xray-${{ matrix.module_arch }}
           name=Xray Core ${{ matrix.module_arch }}
-          version=${DATE}
-          versionCode=${TAG}
+          version=${{ env.DATE }}
+          versionCode=${{ env.TAG }}
           author=GitHub Actions
           description=Advanced Xray-core Magisk module for Android
           minApi=21
@@ -189,17 +187,27 @@ jobs:
           #MAGISK
           EOF
 
+      - name: Create Magisk ZIP
+        run: |
+          MODULE=xray-magisk-${{ matrix.module_arch }}
+          ZIP_FILE="${MODULE}-${{ env.DATE }}.zip"
+          
+          cd $MODULE
+          zip -r ../$ZIP_FILE .
+          cd ..
+          
+          ls -lh $ZIP_FILE
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: xray-magisk-${{ matrix.module_arch }}
-          path: xray-magisk-${{ matrix.module_arch }}-${DATE}.zip
+          path: xray-magisk-${{ matrix.module_arch }}-${{ env.DATE }}.zip
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: xray-${TAG}
-          name: Xray Magisk ${DATE}
-          files: |
-            xray-magisk-${{ matrix.module_arch }}-${DATE}.zip
+          tag_name: xray-${{ env.TAG }}
+          name: Xray Magisk ${{ env.DATE }}
+          files: xray-magisk-${{ matrix.module_arch }}-${{ env.DATE }}.zip
           generate_release_notes: true
