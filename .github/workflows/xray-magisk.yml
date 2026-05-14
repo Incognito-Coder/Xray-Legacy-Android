@@ -49,7 +49,9 @@ jobs:
             curl \
             jq \
             upx-ucl \
-            build-essential
+            build-essential \
+            gcc-arm-linux-gnueabihf \
+            gcc-aarch64-linux-gnu
 
       - name: Clone Xray-core
         run: |
@@ -79,12 +81,15 @@ jobs:
         run: |
           cd xray
 
-          export CGO_ENABLED=0
+          export CGO_ENABLED=1
           export GOOS=android
           export GOARCH=${{ matrix.goarch }}
 
           if [ "${{ matrix.goarch }}" = "arm" ]; then
             export GOARM=${{ matrix.goarm }}
+            export CC=arm-linux-gnueabihf-gcc
+          elif [ "${{ matrix.goarch }}" = "arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
           fi
 
           mkdir -p build
