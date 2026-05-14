@@ -1,0 +1,205 @@
+name: Advanced Xray Magisk Builder
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  XRAY_REPO: https://github.com/XTLS/Xray-core.git
+  GO_VERSION: "1.24"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm
+            goarch: arm
+            goarm: 7
+            module_arch: armv7
+            binary_name: xray
+
+          - arch: arm64
+            goarch: arm64
+            module_arch: arm64
+            binary_name: xray
+
+    steps:
+      - name: Generate variables
+        id: vars
+        run: |
+          echo "DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+          echo "TAG=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
+
+      - name: Install packages
+        run: |
+          sudo apt update
+
+          sudo apt install -y \
+            git \
+            zip \
+            unzip \
+            curl \
+            jq \
+            upx-ucl
+
+      - name: Clone Xray-core
+        run: |
+          git clone --depth 1 $XRAY_REPO xray
+
+          cd xray
+
+          git submodule update --init --recursive
+
+          echo "XRAY_VERSION=$(git describe --tags --always)" >> $GITHUB_ENV
+          echo "XRAY_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-${{ matrix.module_arch }}-go-${{ hashFiles('xray/go.sum') }}
+
+      - name: Build Xray
+        run: |
+          cd xray
+
+          export CGO_ENABLED=0
+          export GOOS=android
+          export GOARCH=${{ matrix.goarch }}
+
+          if [ "${{ matrix.goarch }}" = "arm" ]; then
+            export GOARM=${{ matrix.goarm }}
+          fi
+
+          mkdir -p build
+
+          go build \
+            -v \
+            -trimpath \
+            -buildvcs=false \
+            -ldflags="
+              -s -w
+              -buildid=
+              -X github.com/xtls/xray-core/core.build=${DATE}
+            " \
+            -o build/${{ matrix.binary_name }} \
+            ./main
+
+      - name: Compress binary
+        run: |
+          upx --best --lzma xray/build/${{ matrix.binary_name }} || true
+
+      - name: Verify binary
+        run: |
+          file xray/build/${{ matrix.binary_name }}
+
+      - name: Create Magisk module
+        run: |
+          MODULE=xray-magisk-${{ matrix.module_arch }}
+
+          mkdir -p $MODULE/system/bin
+          mkdir -p $MODULE/system/etc/xray
+          mkdir -p $MODULE/META-INF/com/google/android
+
+          cp xray/build/${{ matrix.binary_name }} \
+             $MODULE/system/bin/xray
+
+          chmod 755 $MODULE/system/bin/xray
+
+          cat > $MODULE/module.prop <<EOF
+          id=xray-${{ matrix.module_arch }}
+          name=Xray Core ${{ matrix.module_arch }}
+          version=${DATE}
+          versionCode=${TAG}
+          author=GitHub Actions
+          description=Advanced Xray-core Magisk module for Android
+          minApi=21
+          minMagisk=20000
+          EOF
+
+          cat > $MODULE/service.sh <<'EOF'
+          #!/system/bin/sh
+
+          MODDIR=${0%/*}
+
+          XRAY_BIN="$MODDIR/system/bin/xray"
+          XRAY_CONFIG="$MODDIR/system/etc/xray/config.json"
+          LOGFILE="/data/local/tmp/xray.log"
+
+          chmod 755 "$XRAY_BIN"
+
+          while [ ! -d /sys/class/net ]; do
+              sleep 2
+          done
+
+          pkill -f "/system/bin/xray" 2>/dev/null
+
+          nohup "$XRAY_BIN" run \
+            -config "$XRAY_CONFIG" \
+            >> "$LOGFILE" 2>&1 &
+          EOF
+
+          chmod 755 $MODULE/service.sh
+
+          cat > $MODULE/post-fs-data.sh <<'EOF'
+          #!/system/bin/sh
+          sleep 5
+          EOF
+
+          chmod 755 $MODULE/post-fs-data.sh
+
+          cat > $MODULE/system/etc/xray/config.json <<'EOF'
+          {
+            "log": {
+              "loglevel": "warning"
+            },
+            "inbounds": [],
+            "outbounds": [
+              {
+                "protocol": "freedom"
+              }
+            ]
+          }
+          EOF
+
+          cat > $MODULE/META-INF/com/google/android/update-binary <<'EOF'
+          #!/sbin/sh
+          exit 0
+          EOF
+
+          chmod 755 \
+            $MODULE/META-INF/com/google/android/update-binary
+
+          cat > $MODULE/META-INF/com/google/android/updater-script <<'EOF'
+          #MAGISK
+          EOF
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xray-magisk-${{ matrix.module_arch }}
+          path: xray-magisk-${{ matrix.module_arch }}-${DATE}.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: xray-${TAG}
+          name: Xray Magisk ${DATE}
+          files: |
+            xray-magisk-${{ matrix.module_arch }}-${DATE}.zip
+          generate_release_notes: true
