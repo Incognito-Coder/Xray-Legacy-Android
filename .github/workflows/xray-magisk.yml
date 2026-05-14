@@ -77,30 +77,40 @@ jobs:
             ~/.cache/go-build
           key: ${{ runner.os }}-${{ matrix.module_arch }}-go-${{ hashFiles('xray/go.sum') }}
 
-      - name: Build Xray
-        run: |
-          cd xray
+      - name: Install Android NDK
+  run: |
+    sudo apt update
+    sudo apt install -y android-sdk-platform-tools-common
+    
+    # Or use a dedicated NDK action
+    # - uses: nttld/setup-ndk@v1
+    #   with:
+    #     ndk-version: r26
 
-          export CGO_ENABLED=1
-          export GOOS=android
-          export GOARCH=${{ matrix.goarch }}
+- name: Build Xray
+  run: |
+    cd xray
 
-          if [ "${{ matrix.goarch }}" = "arm" ]; then
-            export GOARM=${{ matrix.goarm }}
-            export CC=arm-linux-gnueabihf-gcc
-          elif [ "${{ matrix.goarch }}" = "arm64" ]; then
-            export CC=aarch64-linux-gnu-gcc
-          fi
+    export CGO_ENABLED=1
+    export GOOS=android
+    export GOARCH=${{ matrix.goarch }}
 
-          mkdir -p build
+    if [ "${{ matrix.goarch }}" = "arm" ]; then
+      export GOARM=${{ matrix.goarm }}
+      export CC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang
+    elif [ "${{ matrix.goarch }}" = "arm64" ]; then
+      export CC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang
+    fi
 
-          go build \
-            -v \
-            -trimpath \
-            -buildvcs=false \
-            -ldflags="-s -w -buildid= -X github.com/xtls/xray-core/core.build=${{ env.DATE }}" \
-            -o build/${{ matrix.binary_name }} \
-            ./main
+    mkdir -p build
+
+    go build \
+      -v \
+      -trimpath \
+      -buildvcs=false \
+      -ldflags="-s -w -buildid= -X github.com/xtls/xray-core/core.build=${{ env.DATE }}" \
+      -o build/${{ matrix.binary_name }} \
+      ./main
 
       - name: Compress binary
         run: |
