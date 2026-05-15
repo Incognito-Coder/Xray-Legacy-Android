@@ -2,7 +2,7 @@ name: Advanced Xray Magisk Builder
 
 on:
   schedule:
-    - cron: '0 */12 * * *'
+    - cron: "0 */12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -97,6 +97,9 @@ jobs:
             export CC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang
           fi
 
+          export CGO_CFLAGS="-fPIE"
+          export CGO_LDFLAGS="-fPIE -Wl,-z,relro -Wl,-z,now"
+
           mkdir -p build
 
           go build \
@@ -129,12 +132,18 @@ jobs:
 
           chmod 755 $MODULE/system/bin/xray
 
+          # Download geoip and geosite data files
+          wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat \
+            -O $MODULE/system/bin/geoip.dat
+          wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat \
+            -O $MODULE/system/bin/geosite.dat
+
           cat > $MODULE/module.prop <<EOF
           id=xray-${{ matrix.module_arch }}
-          name=Xray Core ${{ matrix.module_arch }}
+          name=Xray Core ${{ matrix.module_arch }} for Magisk
           version=${{ env.DATE }}
           versionCode=${{ env.TAG }}
-          author=GitHub Actions
+          author=Incognito-Coder
           description=Advanced Xray-core Magisk module for Android
           minApi=21
           minMagisk=20000
@@ -163,6 +172,70 @@ jobs:
           EOF
 
           chmod 755 $MODULE/service.sh
+
+          cat > $MODULE/system/bin/xray-ctl <<'EOF'
+          #!/system/bin/sh
+
+          MODDIR=${0%/*}/../..
+          XRAY_BIN="$MODDIR/system/bin/xray"
+          XRAY_CONFIG="$MODDIR/system/etc/xray/config.json"
+          LOGFILE="/data/local/tmp/xray.log"
+          PID_FILE="/data/local/tmp/xray.pid"
+
+          case "$1" in
+            start)
+              if pgrep -f "$XRAY_BIN" > /dev/null; then
+                echo "Xray is already running"
+              else
+                chmod 755 "$XRAY_BIN"
+                nohup "$XRAY_BIN" run \
+                  -config "$XRAY_CONFIG" \
+                  >> "$LOGFILE" 2>&1 &
+                echo $! > "$PID_FILE"
+                echo "Xray started"
+              fi
+              ;;
+            stop)
+              if pkill -f "$XRAY_BIN"; then
+                rm -f "$PID_FILE"
+                echo "Xray stopped"
+              else
+                echo "Xray is not running"
+              fi
+              ;;
+            restart)
+              pkill -f "$XRAY_BIN" 2>/dev/null
+              sleep 1
+              chmod 755 "$XRAY_BIN"
+              nohup "$XRAY_BIN" run \
+                -config "$XRAY_CONFIG" \
+                >> "$LOGFILE" 2>&1 &
+              echo $! > "$PID_FILE"
+              echo "Xray restarted"
+              ;;
+            log)
+              if [ -f "$LOGFILE" ]; then
+                tail -f "$LOGFILE"
+              else
+                echo "Log file not found: $LOGFILE"
+              fi
+              ;;
+            status)
+              if pgrep -f "$XRAY_BIN" > /dev/null; then
+                echo "Xray is running"
+                pgrep -f "$XRAY_BIN"
+              else
+                echo "Xray is not running"
+              fi
+              ;;
+            *)
+              echo "Usage: $0 {start|stop|restart|log|status}"
+              exit 1
+              ;;
+          esac
+          EOF
+
+          chmod 755 $MODULE/system/bin/xray-ctl
 
           cat > $MODULE/post-fs-data.sh <<'EOF'
           #!/system/bin/sh
@@ -201,11 +274,11 @@ jobs:
         run: |
           MODULE=xray-magisk-${{ matrix.module_arch }}
           ZIP_FILE="${MODULE}-${{ env.DATE }}.zip"
-          
+
           cd $MODULE
           zip -r ../$ZIP_FILE .
           cd ..
-          
+
           ls -lh $ZIP_FILE
 
       - name: Upload artifact
