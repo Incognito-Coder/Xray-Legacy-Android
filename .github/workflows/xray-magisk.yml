@@ -121,6 +121,8 @@ jobs:
 
       - name: Create Magisk module
         run: |
+          cd "$GITHUB_WORKSPACE"
+
           MODULE=xray-magisk-${{ matrix.module_arch }}
 
           mkdir -p $MODULE/system/bin
