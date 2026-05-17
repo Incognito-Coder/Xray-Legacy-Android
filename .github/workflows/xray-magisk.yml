@@ -38,6 +38,9 @@ jobs:
           echo "DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
           echo "TAG=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
 
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Install packages
         run: |
           sudo apt update
@@ -139,7 +142,7 @@ jobs:
             -O $MODULE/system/bin/geosite.dat
 
           # Copy template files from repo
-          ROOT_DIR=$(pwd)
+          ROOT_DIR=${GITHUB_WORKSPACE}
           cp $ROOT_DIR/magisk-template/service.sh $MODULE/service.sh
           cp $ROOT_DIR/magisk-template/system/bin/xray-ctl $MODULE/system/bin/xray-ctl
           cp $ROOT_DIR/magisk-template/post-fs-data.sh $MODULE/post-fs-data.sh
