@@ -2,7 +2,7 @@ name: Advanced Xray Magisk Builder
 
 on:
   schedule:
-    - cron: "0 */12 * * *"
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -138,137 +138,24 @@ jobs:
           wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat \
             -O $MODULE/system/bin/geosite.dat
 
-          cat > $MODULE/module.prop <<EOF
-          id=xray-${{ matrix.module_arch }}
-          name=Xray Core ${{ matrix.module_arch }} for Magisk
-          version=${{ env.DATE }}
-          versionCode=${{ env.TAG }}
-          author=Incognito-Coder
-          description=Advanced Xray-core Magisk module for Android
-          minApi=21
-          minMagisk=20000
-          EOF
+          # Copy template files from repo
+          cp magisk-template/service.sh $MODULE/service.sh
+          cp magisk-template/system/bin/xray-ctl $MODULE/system/bin/xray-ctl
+          cp magisk-template/post-fs-data.sh $MODULE/post-fs-data.sh
+          cp magisk-template/system/etc/xray/config.json $MODULE/system/etc/xray/config.json
+          cp magisk-template/META-INF/com/google/android/update-binary $MODULE/META-INF/com/google/android/update-binary
+          cp magisk-template/META-INF/com/google/android/updater-script $MODULE/META-INF/com/google/android/updater-script
 
-          cat > $MODULE/service.sh <<'EOF'
-          #!/system/bin/sh
-
-          MODDIR=${0%/*}
-
-          XRAY_BIN="$MODDIR/system/bin/xray"
-          XRAY_CONFIG="$MODDIR/system/etc/xray/config.json"
-          LOGFILE="/data/local/tmp/xray.log"
-
-          chmod 755 "$XRAY_BIN"
-
-          while [ ! -d /sys/class/net ]; do
-              sleep 2
-          done
-
-          pkill -f "/system/bin/xray" 2>/dev/null
-
-          nohup "$XRAY_BIN" run \
-            -config "$XRAY_CONFIG" \
-            >> "$LOGFILE" 2>&1 &
-          EOF
+          # Render module.prop from template
+          sed -e "s|{{MODULE_ARCH}}|${{ matrix.module_arch }}|g" \
+              -e "s|{{DATE}}|${{ env.DATE }}|g" \
+              -e "s|{{TAG}}|${{ env.TAG }}|g" \
+              magisk-template/module.prop.tpl > $MODULE/module.prop
 
           chmod 755 $MODULE/service.sh
-
-          cat > $MODULE/system/bin/xray-ctl <<'EOF'
-          #!/system/bin/sh
-
-          MODDIR=${0%/*}/../..
-          XRAY_BIN="$MODDIR/system/bin/xray"
-          XRAY_CONFIG="$MODDIR/system/etc/xray/config.json"
-          LOGFILE="/data/local/tmp/xray.log"
-          PID_FILE="/data/local/tmp/xray.pid"
-
-          case "$1" in
-            start)
-              if pgrep -f "$XRAY_BIN" > /dev/null; then
-                echo "Xray is already running"
-              else
-                chmod 755 "$XRAY_BIN"
-                nohup "$XRAY_BIN" run \
-                  -config "$XRAY_CONFIG" \
-                  >> "$LOGFILE" 2>&1 &
-                echo $! > "$PID_FILE"
-                echo "Xray started"
-              fi
-              ;;
-            stop)
-              if pkill -f "$XRAY_BIN"; then
-                rm -f "$PID_FILE"
-                echo "Xray stopped"
-              else
-                echo "Xray is not running"
-              fi
-              ;;
-            restart)
-              pkill -f "$XRAY_BIN" 2>/dev/null
-              sleep 1
-              chmod 755 "$XRAY_BIN"
-              nohup "$XRAY_BIN" run \
-                -config "$XRAY_CONFIG" \
-                >> "$LOGFILE" 2>&1 &
-              echo $! > "$PID_FILE"
-              echo "Xray restarted"
-              ;;
-            log)
-              if [ -f "$LOGFILE" ]; then
-                tail -f "$LOGFILE"
-              else
-                echo "Log file not found: $LOGFILE"
-              fi
-              ;;
-            status)
-              if pgrep -f "$XRAY_BIN" > /dev/null; then
-                echo "Xray is running"
-                pgrep -f "$XRAY_BIN"
-              else
-                echo "Xray is not running"
-              fi
-              ;;
-            *)
-              echo "Usage: $0 {start|stop|restart|log|status}"
-              exit 1
-              ;;
-          esac
-          EOF
-
           chmod 755 $MODULE/system/bin/xray-ctl
-
-          cat > $MODULE/post-fs-data.sh <<'EOF'
-          #!/system/bin/sh
-          sleep 5
-          EOF
-
           chmod 755 $MODULE/post-fs-data.sh
-
-          cat > $MODULE/system/etc/xray/config.json <<'EOF'
-          {
-            "log": {
-              "loglevel": "warning"
-            },
-            "inbounds": [],
-            "outbounds": [
-              {
-                "protocol": "freedom"
-              }
-            ]
-          }
-          EOF
-
-          cat > $MODULE/META-INF/com/google/android/update-binary <<'EOF'
-          #!/sbin/sh
-          exit 0
-          EOF
-
-          chmod 755 \
-            $MODULE/META-INF/com/google/android/update-binary
-
-          cat > $MODULE/META-INF/com/google/android/updater-script <<'EOF'
-          #MAGISK
-          EOF
+          chmod 755 $MODULE/META-INF/com/google/android/update-binary
 
       - name: Create Magisk ZIP
         run: |

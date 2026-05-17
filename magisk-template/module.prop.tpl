@@ -1,0 +1,8 @@
+id=xray-{{MODULE_ARCH}}
+name=Xray Core {{MODULE_ARCH}} for Magisk
+version={{DATE}}
+versionCode={{TAG}}
+author=Incognito-Coder
+description=Advanced Xray-core Magisk module for Android
+minApi=21
+minMagisk=20000

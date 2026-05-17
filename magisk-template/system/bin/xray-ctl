@@ -1,0 +1,107 @@
+#!/system/bin/sh
+
+MODDIR=${0%/*}/../..
+XRAY_BIN="$MODDIR/system/bin/xray"
+XRAY_CONFIG="$MODDIR/system/etc/xray/config.json"
+LOGFILE="/data/local/tmp/xray.log"
+PID_FILE="/data/local/tmp/xray.pid"
+
+do_start() {
+  if pgrep -f "$XRAY_BIN" > /dev/null; then
+    echo "Xray is already running"
+  else
+    chmod 755 "$XRAY_BIN"
+    nohup "$XRAY_BIN" run \
+      -config "$XRAY_CONFIG" \
+      >> "$LOGFILE" 2>&1 &
+    echo $! > "$PID_FILE"
+    echo "Xray started"
+  fi
+}
+
+do_stop() {
+  if pkill -f "$XRAY_BIN"; then
+    rm -f "$PID_FILE"
+    echo "Xray stopped"
+  else
+    echo "Xray is not running"
+  fi
+}
+
+do_restart() {
+  pkill -f "$XRAY_BIN" 2>/dev/null
+  sleep 1
+  chmod 755 "$XRAY_BIN"
+  nohup "$XRAY_BIN" run \
+    -config "$XRAY_CONFIG" \
+    >> "$LOGFILE" 2>&1 &
+  echo $! > "$PID_FILE"
+  echo "Xray restarted"
+}
+
+do_log() {
+  if [ -f "$LOGFILE" ]; then
+    tail -f "$LOGFILE"
+  else
+    echo "Log file not found: $LOGFILE"
+  fi
+}
+
+do_status() {
+  if pgrep -f "$XRAY_BIN" > /dev/null; then
+    echo "Xray is running"
+    pgrep -f "$XRAY_BIN"
+  else
+    echo "Xray is not running"
+  fi
+}
+
+interactive_menu() {
+  while true; do
+    printf "\nXray Control - Terminal UI\n"
+    printf "1) Start\n"
+    printf "2) Stop\n"
+    printf "3) Restart\n"
+    printf "4) Status\n"
+    printf "5) Tail Log\n"
+    printf "6) Quit\n"
+    printf "Select an option [1-6]: "
+    read choice
+    case "$choice" in
+      1) do_start ;;
+      2) do_stop ;;
+      3) do_restart ;;
+      4) do_status ;;
+      5) do_log ;;
+      6) echo "Exiting."; return 0 ;;
+      *) echo "Invalid choice" ;;
+    esac
+  done
+}
+
+if [ "$#" -eq 0 ]; then
+  interactive_menu
+  exit 0
+fi
+
+case "$1" in
+  start)
+    do_start
+    ;;
+  stop)
+    do_stop
+    ;;
+  restart)
+    do_restart
+    ;;
+  log)
+    do_log
+    ;;
+  status)
+    do_status
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|log|status}";
+    exit 1
+    ;;
+esac
