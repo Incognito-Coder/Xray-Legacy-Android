@@ -6,3 +6,6 @@ author=Incognito-Coder
 description=Advanced Xray-core Magisk module for Android
 minApi=21
 minMagisk=20000
+action=xray-action.sh
+actionTitle=Restart Xray
+actionDesc=Restart the Xray service from Magisk Manager

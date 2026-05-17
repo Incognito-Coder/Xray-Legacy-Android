@@ -40,6 +40,10 @@ xray-ctl log
 xray-ctl status
 ```
 
+### Magisk Manager Action
+
+This module includes a Magisk Manager action button that restarts Xray directly from the module page.
+
 ### Log Location
 
 Xray logs are stored at: `/data/local/tmp/xray.log`
