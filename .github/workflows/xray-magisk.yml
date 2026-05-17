@@ -139,19 +139,19 @@ jobs:
             -O $MODULE/system/bin/geosite.dat
 
           # Copy template files from repo
-          cd ../..
-          cp magisk-template/service.sh $MODULE/service.sh
-          cp magisk-template/system/bin/xray-ctl $MODULE/system/bin/xray-ctl
-          cp magisk-template/post-fs-data.sh $MODULE/post-fs-data.sh
-          cp magisk-template/system/etc/xray/config.json $MODULE/system/etc/xray/config.json
-          cp magisk-template/META-INF/com/google/android/update-binary $MODULE/META-INF/com/google/android/update-binary
-          cp magisk-template/META-INF/com/google/android/updater-script $MODULE/META-INF/com/google/android/updater-script
+          ROOT_DIR=$(pwd)
+          cp $ROOT_DIR/magisk-template/service.sh $MODULE/service.sh
+          cp $ROOT_DIR/magisk-template/system/bin/xray-ctl $MODULE/system/bin/xray-ctl
+          cp $ROOT_DIR/magisk-template/post-fs-data.sh $MODULE/post-fs-data.sh
+          cp $ROOT_DIR/magisk-template/system/etc/xray/config.json $MODULE/system/etc/xray/config.json
+          cp $ROOT_DIR/magisk-template/META-INF/com/google/android/update-binary $MODULE/META-INF/com/google/android/update-binary
+          cp $ROOT_DIR/magisk-template/META-INF/com/google/android/updater-script $MODULE/META-INF/com/google/android/updater-script
 
           # Render module.prop from template
           sed -e "s|{{MODULE_ARCH}}|${{ matrix.module_arch }}|g" \
               -e "s|{{DATE}}|${{ env.DATE }}|g" \
               -e "s|{{TAG}}|${{ env.TAG }}|g" \
-              magisk-template/module.prop.tpl > $MODULE/module.prop
+              $ROOT_DIR/magisk-template/module.prop.tpl > $MODULE/module.prop
 
           chmod 755 $MODULE/service.sh
           chmod 755 $MODULE/system/bin/xray-ctl
