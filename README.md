@@ -15,7 +15,7 @@ GitHub Actions workflow for building and packaging Xray-core as a Magisk module 
 
 1. Flash the generated Magisk module ZIP via Magisk Manager
 2. Reboot your device
-3. Configure xray using the config.json file at `/data/adb/modules/xray-*/system/etc/xray/config.json`
+3. Configure xray using the config.json file at `/data/adb/modules/xray-*/system/etc/xray/config.json` or `/etc/xray/config.json`
 
 ## Service Control
 
