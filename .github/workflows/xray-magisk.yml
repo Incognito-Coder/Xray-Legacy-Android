@@ -10,7 +10,7 @@ permissions:
 
 env:
   XRAY_REPO: https://github.com/XTLS/Xray-core.git
-  GO_VERSION: "1.24"
+  GO_VERSION: "1.26"
 
 jobs:
   build:
@@ -39,7 +39,7 @@ jobs:
           echo "TAG=$(date +'%Y%m%d-%H%M')" >> $GITHUB_ENV
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install packages
         run: |
@@ -73,7 +73,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Cache Go modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/go/pkg/mod
@@ -175,7 +175,7 @@ jobs:
           ls -lh $ZIP_FILE
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: xray-magisk-${{ matrix.module_arch }}
           path: xray-magisk-${{ matrix.module_arch }}-${{ env.DATE }}.zip
